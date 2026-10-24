@@ -68,7 +68,7 @@ export class ClaudeCodeProc {
     this.cwd = opts.cwd
     this.claudeBinary = opts.claudeBinary
     this.model = opts.model ?? 'sonnet'
-    this.permissionMode = opts.permissionMode ?? 'bypassPermissions'
+    this.permissionMode = opts.permissionMode ?? 'auto'
     this.resume = opts.resume ?? false
     this.onEvent = onEvent
   }

@@ -8,7 +8,7 @@ export interface ProjectEntry {
   path: string
 }
 
-export type PermissionMode = 'bypassPermissions' | 'acceptEdits' | 'default'
+export type PermissionMode = 'auto' | 'bypassPermissions' | 'acceptEdits' | 'default'
 export type ModelName = 'sonnet' | 'opus' | 'haiku' | string
 
 export interface ConfigFile {
@@ -28,6 +28,7 @@ export interface RuntimeConfig extends ConfigFile {
 }
 
 export const VALID_PERMISSION_MODES: ReadonlySet<PermissionMode> = new Set([
+  'auto',
   'bypassPermissions',
   'acceptEdits',
   'default',
@@ -57,11 +58,10 @@ function defaultConfig(): ConfigFile {
     ],
     defaultProjectName: 'g2',
     claudeBinary: 'claude',
-    // Skip permission prompts entirely so voice flows never get stuck waiting
-    // for an approval the user can't see. Equivalent to passing
-    // --dangerously-skip-permissions / --permission-mode bypassPermissions
-    // to the claude CLI.
-    permissionMode: 'bypassPermissions',
+    // Let the claude CLI's auto mode decide what needs approval so voice flows
+    // rarely get stuck waiting on a prompt the user can't see. Passed as
+    // --permission-mode auto.
+    permissionMode: 'auto',
     model: 'sonnet',
   }
 }
@@ -94,7 +94,7 @@ export function loadConfig(): RuntimeConfig {
   // most permissive / smartest combination so existing users don't have to
   // touch anything.
   if (!cfg.permissionMode || !VALID_PERMISSION_MODES.has(cfg.permissionMode)) {
-    cfg.permissionMode = 'bypassPermissions'
+    cfg.permissionMode = 'auto'
     created = true
   }
   if (!cfg.model || typeof cfg.model !== 'string') {

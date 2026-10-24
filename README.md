@@ -86,7 +86,7 @@ PORT=8787               # optional, default 8787
     { "name": "myapp", "path": "/Users/you/code/myapp" }
   ],
   "defaultProjectName": "myapp",
-  "permissionMode": "bypassPermissions",
+  "permissionMode": "auto",
   "model": "sonnet"
 }
 ```
@@ -146,6 +146,14 @@ The backend spawns the `claude` CLI in headless mode, writes user turns as JSON 
 The frontend is built on [even-toolkit](https://github.com/nicedoc/even-toolkit) — the per-screen glasses router, display builders, and nav helpers for Even Realities hardware.
 
 ---
+
+### Continuing a glasses session at your computer
+
+Glasses sessions are normal Claude Code sessions, saved to `~/.claude/projects/<project>/<session-id>.jsonl`. To pick one up at your desk, run `claude --resume <session-id>` from the project directory, or find it in the Claude Code desktop app's session list.
+
+- Only one client should use a session at a time. The backend refuses to send a turn while another `claude` process references the session id, and the glasses show an error until you close the other window.
+- The HUD brevity prompt is applied per launch by the backend, so it does not follow the session to your computer.
+- The backend's tool allowlist and `--max-turns` limit also apply only to glasses turns.
 
 ## Project Layout
 

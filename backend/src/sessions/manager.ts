@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import type { RuntimeConfig } from '../config.ts'
 import type { SseHub } from '../events.ts'
 import { ClaudeCodeProc } from './claudeProc.ts'
@@ -101,6 +102,9 @@ export class SessionManager {
     // If the proc was reaped after the previous turn's result, spawn a fresh
     // one with --resume so the CLI picks up the same session id and context.
     const needsResume = !this.procs.has(id)
+    if (needsResume && isHeldByOtherProcess(id)) {
+      throw new Error('Session is open in another Claude Code window. Close it or wait until it is idle.')
+    }
     const proc = this.ensureProc(session, { resume: needsResume })
     proc.send(text)
   }
@@ -167,6 +171,15 @@ export class SessionManager {
     this.procs.clear()
     this.store.saveNow()
   }
+}
+
+// Two CLIs appending to one transcript can interleave history, so refuse to
+// spawn while a process that isn't ours already references this session id
+// (e.g. `claude --resume <id>` at the desk). Best-effort: pgrep only sees
+// processes whose command line contains the id.
+function isHeldByOtherProcess(sessionId: string): boolean {
+  const r = spawnSync('pgrep', ['-f', sessionId], { encoding: 'utf8' })
+  return r.status === 0 && r.stdout.trim().length > 0
 }
 
 function deriveTitle(firstPrompt: string): string {

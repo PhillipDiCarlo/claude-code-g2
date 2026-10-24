@@ -76,7 +76,7 @@ export async function getConfig(): Promise<BackendConfig> {
   return res.json()
 }
 
-export type PermissionMode = 'bypassPermissions' | 'acceptEdits' | 'default'
+export type PermissionMode = 'auto' | 'bypassPermissions' | 'acceptEdits' | 'default'
 
 export interface Settings {
   permissionMode: PermissionMode

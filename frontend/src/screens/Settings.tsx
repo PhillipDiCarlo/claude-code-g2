@@ -5,7 +5,8 @@ import { getSettings, saveSettings, type Settings as SettingsData, type Permissi
 import { useAppState } from '../store'
 
 const PERM_OPTS: { value: PermissionMode; label: string; hint: string }[] = [
-  { value: 'bypassPermissions', label: 'Skip all (recommended)', hint: '--dangerously-skip-permissions' },
+  { value: 'auto', label: 'Auto (recommended)', hint: 'CLI decides what needs approval' },
+  { value: 'bypassPermissions', label: 'Skip all', hint: '--dangerously-skip-permissions' },
   { value: 'acceptEdits', label: 'Auto-accept edits', hint: 'gates Bash + dangerous tools' },
   { value: 'default', label: 'Prompt every time', hint: 'not hands-free' },
 ]
