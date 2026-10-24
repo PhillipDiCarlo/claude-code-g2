@@ -28,7 +28,7 @@ Both must pass. If you touched the glasses UI, test with the [evenhub-simulator]
 
 ## Architecture
 
-- `backend/` — Bun + Express. Spawns `claude` CLI, manages sessions, Whisper transcription.
+- `backend/` — Bun + Express. Spawns `claude` CLI, manages sessions, local whisper.cpp transcription.
 - `frontend/` — Vite + React. Phone companion pane + glasses HUD via `even-toolkit`.
 - `frontend/src/glass/` — all glasses-specific code. `screens/` has one file per HUD screen.
 

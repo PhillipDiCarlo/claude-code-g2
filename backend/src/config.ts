@@ -18,7 +18,6 @@ export interface ConfigFile {
   claudeBinary: string
   permissionMode: PermissionMode
   model: ModelName
-  openaiApiKey?: string
 }
 
 export interface RuntimeConfig extends ConfigFile {
