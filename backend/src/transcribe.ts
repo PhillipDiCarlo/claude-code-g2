@@ -1,22 +1,30 @@
 import type { Request, Response } from 'express'
-import OpenAI from 'openai'
-import { toFile } from 'openai/uploads'
+import { spawn } from 'node:child_process'
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import * as crypto from 'node:crypto'
 
 // POST /api/transcribe. Accepts `audio/wav` or `audio/pcm` (raw 16 kHz s16le
 // mono — the glasses format). Raw PCM gets a 44-byte RIFF header prepended
-// so Whisper accepts it without an ffmpeg hop.
+// so whisper.cpp accepts it without an ffmpeg hop.
+//
+// Transcription runs locally via the whisper.cpp CLI (`brew install
+// whisper-cpp`). Override the binary / model with WHISPER_BIN and
+// WHISPER_MODEL.
 
 const SAMPLE_RATE = 16_000
 const CHANNELS = 1
 const BITS_PER_SAMPLE = 16
 
-let clientSingleton: OpenAI | null = null
-function client(): OpenAI {
-  if (clientSingleton) return clientSingleton
-  const key = process.env.OPENAI_API_KEY
-  if (!key) throw new Error('OPENAI_API_KEY is not set')
-  clientSingleton = new OpenAI({ apiKey: key })
-  return clientSingleton
+const DEFAULT_WHISPER_MODEL = path.join(os.homedir(), '.cc-g2', 'models', 'ggml-base.en.bin')
+
+function whisperBin(): string {
+  return process.env.WHISPER_BIN || 'whisper-cli'
+}
+
+function whisperModel(): string {
+  return process.env.WHISPER_MODEL || DEFAULT_WHISPER_MODEL
 }
 
 export function pcmToWav(
@@ -48,6 +56,36 @@ export function pcmToWav(
   return Buffer.concat([header, pcm])
 }
 
+function runWhisper(wavPath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // -nt: no timestamps, -np: no progress/system info, so stdout is just the text.
+    const proc = spawn(whisperBin(), ['-m', whisperModel(), '-f', wavPath, '-l', 'en', '-nt', '-np'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', (d) => (stdout += d))
+    proc.stderr.on('data', (d) => (stderr += d))
+    proc.on('error', reject)
+    proc.on('close', (code) => {
+      if (code === 0) resolve(stdout)
+      else reject(new Error(`${whisperBin()} exited with code ${code}: ${stderr.trim()}`))
+    })
+  })
+}
+
+// whisper.cpp emits one line per segment and bracketed tags like
+// [BLANK_AUDIO] for silence; collapse to a single plain string.
+function cleanTranscript(raw: string): string {
+  return raw
+    .replace(/\[[A-Z_ ]+\]/g, '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+}
+
 export async function transcribeHandler(req: Request, res: Response): Promise<void> {
   const body = req.body
   if (!Buffer.isBuffer(body) || body.length === 0) {
@@ -67,17 +105,15 @@ export async function transcribeHandler(req: Request, res: Response): Promise<vo
     return
   }
 
+  const wavPath = path.join(os.tmpdir(), `cc-g2-${crypto.randomUUID()}.wav`)
   try {
-    const file = await toFile(wavBuffer, 'audio.wav', { type: 'audio/wav' })
-    const result = await client().audio.transcriptions.create({
-      file,
-      model: 'whisper-1',
-      language: 'en',
-      response_format: 'json',
-    })
-    res.json({ text: result.text.trim() })
+    await fs.writeFile(wavPath, wavBuffer)
+    const text = cleanTranscript(await runWhisper(wavPath))
+    res.json({ text })
   } catch (err) {
-    console.error('[transcribe] openai error:', err)
+    console.error('[transcribe] whisper error:', err)
     res.status(502).json({ error: 'transcription_failed' })
+  } finally {
+    await fs.rm(wavPath, { force: true })
   }
 }

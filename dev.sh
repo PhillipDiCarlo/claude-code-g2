@@ -2,7 +2,8 @@
 # dev.sh — one-shot Claude Code G2 dev launcher
 #
 # What it does:
-#   1. Installs missing deps (bun, cloudflared, qrencode) via brew / curl
+#   1. Installs missing deps (bun, cloudflared, qrencode, whisper-cpp) via brew / curl
+#      and downloads the local Whisper model if missing
 #   2. Runs `bun install` in backend/ and frontend/ if node_modules is missing
 #   3. Frees ports 8787 and 5173, kills stale cloudflared tunnels
 #   4. Boots the backend, extracts the bearer token from its output
@@ -86,9 +87,26 @@ ensure_deps() {
   need claude       || die "claude CLI not found — install from https://code.claude.com and run 'claude auth login'"
 }
 
-ensure_env() {
-  if [[ ! -f "$BACKEND_DIR/.env" ]]; then
-    die "backend/.env missing — copy backend/.env.example to backend/.env and set OPENAI_API_KEY"
+load_env() {
+  # Optional; lets WHISPER_BIN / WHISPER_MODEL overrides apply to the checks below.
+  if [[ -f "$BACKEND_DIR/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$BACKEND_DIR/.env"
+    set +a
+  fi
+}
+
+ensure_whisper() {
+  need "${WHISPER_BIN:-whisper-cli}" || install_brew_pkg whisper-cpp
+  local model="${WHISPER_MODEL:-$HOME/.cc-g2/models/ggml-base.en.bin}"
+  if [[ ! -f "$model" ]]; then
+    say "downloading whisper model to $model (~150 MB, one time)..."
+    mkdir -p "$(dirname "$model")"
+    curl -fL --progress-bar -o "$model.part" \
+      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$(basename "$model")" \
+      || die "model download failed — set WHISPER_MODEL to an existing ggml model file"
+    mv "$model.part" "$model"
   fi
 }
 
@@ -278,7 +296,8 @@ lan_ip() {
 # --- main ------------------------------------------------------------------
 
 ensure_deps
-ensure_env
+load_env
+ensure_whisper
 ensure_node_modules
 
 kill_stale_tunnels

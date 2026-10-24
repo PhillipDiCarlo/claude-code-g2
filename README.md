@@ -36,7 +36,7 @@ Claude Code in the terminal is amazing, but you have to look at your screen. Wit
 
 ## Features
 
-- **Voice-first coding.** Tap → speak → tap. Whisper transcribes, Claude executes, HUD streams the result. No typing needed.
+- **Voice-first coding.** Tap → speak → tap. Whisper transcribes locally on your Mac, Claude executes, HUD streams the result. No typing needed.
 - **Full-screen transcript.** See Claude's full response on a 576x288 green HUD — tool calls, file edits, code output, all live-streamed.
 - **Multi-session.** Browse past sessions in a sidebar overlay, switch between them instantly with cached transcripts.
 - **Project-aware.** Whitelist directories Claude can work in. Sessions auto-use your default project.
@@ -61,8 +61,8 @@ That's it. The script installs deps, starts the backend + tunnel + frontend, and
 ### Requirements
 
 - **macOS** with Claude Max/Pro logged in via `claude auth login` ([install Claude Code](https://code.claude.com))
-- **[Homebrew](https://brew.sh)** (the dev script uses it to install `bun`, `cloudflared`, `qrencode`)
-- **OpenAI API key** for Whisper transcription (~$0.006/min) — set in `backend/.env`
+- **[Homebrew](https://brew.sh)** (the dev script uses it to install `bun`, `cloudflared`, `qrencode`, `whisper-cpp`)
+- Speech-to-text runs locally via [whisper.cpp](https://github.com/ggml-org/whisper.cpp) — no OpenAI key. `dev.sh` downloads the `base.en` model (~150 MB) to `~/.cc-g2/models/` on first run.
 - **Even Realities G2 glasses** + the Even Realities App on your phone
 - Optional: [evenhub-simulator](https://www.npmjs.com/package/@evenrealities/evenhub-simulator) for desktop testing without glasses
 
@@ -70,12 +70,15 @@ That's it. The script installs deps, starts the backend + tunnel + frontend, and
 
 ## Configure
 
-### `backend/.env`
+### `backend/.env` (optional)
 
 ```bash
-OPENAI_API_KEY=sk-...   # required for Whisper
-PORT=8787               # optional, default 8787
+PORT=8787                              # default 8787
+WHISPER_BIN=whisper-cli                # default: whisper-cli on PATH
+WHISPER_MODEL=/path/to/ggml-small.en.bin  # default: ~/.cc-g2/models/ggml-base.en.bin
 ```
+
+Any [ggml Whisper model](https://huggingface.co/ggerganov/whisper.cpp/tree/main) works; larger models are more accurate but slower.
 
 ### `~/.cc-g2/config.json` (auto-generated on first boot)
 
@@ -127,7 +130,7 @@ The `token` is your auth key — treat it like an SSH private key. The `projects
                ▼
 ┌──────────────────────────────┐
 │  backend/ (Bun + Express)    │
-│  • /transcribe  → Whisper    │
+│  • /transcribe  → whisper.cpp│
 │  • /sessions    → CRUD       │
 │  • /events      → SSE stream │
 │  • SessionManager            │
@@ -163,7 +166,7 @@ backend/src/
   config.ts               Config & bearer token
   auth.ts                 Bearer middleware
   events.ts               SSE pub-sub hub
-  transcribe.ts           Whisper endpoint
+  transcribe.ts           Local whisper.cpp endpoint
   sessions/
     store.ts              Disk-backed session store
     claudeProc.ts         Spawns claude CLI, parses stream-json
@@ -247,7 +250,7 @@ cd frontend && bun run build
 - [Even Realities G2](https://www.evenrealities.com) — AR smart glasses
 - [even-toolkit](https://github.com/nicedoc/even-toolkit) — glasses UI framework
 - [Bun](https://bun.sh) — JavaScript runtime
-- [OpenAI Whisper](https://openai.com/research/whisper) — speech-to-text
+- [whisper.cpp](https://github.com/ggml-org/whisper.cpp) — local speech-to-text (OpenAI Whisper models)
 - [Cloudflare Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — secure HTTPS tunnel
 
 ---
